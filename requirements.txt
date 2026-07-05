@@ -1,0 +1,31 @@
+# Core backend
+fastapi==0.116.0
+uvicorn[standard]==0.35.0
+
+# Docker integration
+docker==7.1.0
+
+# Environment management
+python-dotenv==1.1.1
+
+# HTTP requests
+requests==2.32.4
+
+# Templates / dashboard
+jinja2==3.1.6
+
+# Database (SQLite support built into Python)
+sqlalchemy==2.0.41
+
+# Data analytics
+pandas==2.3.0
+
+# AI / LLM
+google-generativeai==0.8.5
+openai==1.93.0
+
+# Validation / serialization
+pydantic==2.11.7
+
+# Optional monitoring / logging
+rich==14.0.0
