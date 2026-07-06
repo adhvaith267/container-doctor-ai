@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Incident History · ContainerDoctor AI{% endblock %}
+{% block eyebrow %}Persistent memory{% endblock %}
+{% block heading %}Incident history{% endblock %}
+{% block description %}Every diagnosis, decision, and recovery result stored by the agent.{% endblock %}
+
+{% block content %}
+<section class="summary-strip">
+    <div>
+        <span>Recorded incidents</span>
+        <strong>{{ incidents | length }}</strong>
+    </div>
+    <p>Newest incidents appear first. Records persist across agent restarts.</p>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <p class="panel-kicker">SQLite memory</p>
+            <h2>All incidents</h2>
+        </div>
+        <span class="count-pill">{{ incidents | length }} total</span>
+    </div>
+
+    {% if incidents %}
+    <div class="table-scroll">
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Container</th>
+                    <th>Detected errors</th>
+                    <th>Root cause</th>
+                    <th>Severity</th>
+                    <th>Action</th>
+                    <th>Result</th>
+                    <th>Timestamp</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for incident in incidents %}
+                <tr>
+                    <td class="record-id">#{{ incident.id }}</td>
+                    <td>
+                        <a class="container-name incident-link" href="{{ url_for('incident_detail', incident_id=incident.id) }}">
+                            {{ incident.container }}
+                        </a>
+                    </td>
+                    <td>
+                        <div class="error-list">
+                            {% for error in incident.errors %}
+                            <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td>{{ incident.root_cause }}</td>
+                    <td>
+                        <span class="badge severity-{{ incident.severity | lower }}">
+                            {{ incident.severity }}
+                        </span>
+                    </td>
+                    <td><span class="action-label">{{ incident.action }}</span></td>
+                    <td>
+                        {% if incident.result.success %}
+                        <span class="result success">Success</span>
+                        {% else %}
+                        <span class="result failed">Failed</span>
+                        {% endif %}
+                    </td>
+                    <td class="timestamp">{{ incident.display_timestamp }}</td>
+                    <td>
+                        <a class="detail-link" href="{{ url_for('incident_detail', incident_id=incident.id) }}">
+                            View →
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <span class="empty-icon" aria-hidden="true">◎</span>
+        <h3>Your incident history is empty</h3>
+        <p>Once the observer detects an issue, the full recovery cycle will be recorded here.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

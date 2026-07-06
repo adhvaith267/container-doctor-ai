@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="description" content="ContainerDoctor AI operations dashboard">
+    <title>{% block title %}ContainerDoctor AI{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <a class="brand" href="{{ url_for('dashboard') }}">
+                <span class="brand-mark" aria-hidden="true">CD</span>
+                <span>
+                    <strong>ContainerDoctor</strong>
+                    <small>Autonomous Container Recovery</small>
+                </span>
+            </a>
+
+            <nav class="primary-nav" aria-label="Primary navigation">
+                <a
+                    href="{{ url_for('dashboard') }}"
+                    class="{% if active_page == 'dashboard' %}active{% endif %}"
+                    {% if active_page == 'dashboard' %}aria-current="page"{% endif %}
+                >
+                    <span class="nav-icon" aria-hidden="true">⌂</span>
+                    Overview
+                </a>
+                <a
+                    href="{{ url_for('incident_history') }}"
+                    class="{% if active_page == 'history' %}active{% endif %}"
+                    {% if active_page == 'history' %}aria-current="page"{% endif %}
+                >
+                    <span class="nav-icon" aria-hidden="true">≡</span>
+                    Incidents
+                </a>
+                <a
+                    href="{{ url_for('analytics_dashboard') }}"
+                    class="{% if active_page == 'analytics' %}active{% endif %}"
+                    {% if active_page == 'analytics' %}aria-current="page"{% endif %}
+                >
+                    <span class="nav-icon" aria-hidden="true">↗</span>
+                    Analytics
+                </a>
+            </nav>
+
+            <div class="agent-state">
+                <span class="agent-state-copy">
+                    <small>System Status</small>
+                    <strong>
+                        <span class="status-dot"></span>
+                        AI Agent Online
+                    </strong>
+                </span>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <p class="eyebrow">{% block eyebrow %}Operations{% endblock %}</p>
+                    <h1>{% block heading %}Dashboard{% endblock %}</h1>
+                    <p class="page-description">
+                        {% block description %}Container health and autonomous recovery at a glance.{% endblock %}
+                    </p>
+                </div>
+                <div
+                    class="docker-status {% if docker_connected %}connected{% else %}unavailable{% endif %}"
+                    data-docker-status
+                >
+                    <span class="status-dot"></span>
+                    <span data-docker-label>
+                        {% if docker_connected %}Docker Connected{% else %}Docker Unavailable{% endif %}
+                    </span>
+                </div>
+            </header>
+
+            {% block content %}{% endblock %}
+
+            <footer class="page-footer">
+                ContainerDoctor AI · Observe → Reason → Decide → Act → Learn
+            </footer>
+        </main>
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Incident #{{ incident.id }} · ContainerDoctor AI{% endblock %}
+{% block eyebrow %}Incident #{{ incident.id }}{% endblock %}
+{% block heading %}{{ incident.container }}{% endblock %}
+{% block description %}A complete view of detection, diagnosis, decision, and recovery.{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{{ url_for('incident_history') }}">← Back to incident history</a>
+
+<section class="incident-hero">
+    <div>
+        <span class="badge severity-{{ incident.severity | lower }}">
+            {{ incident.severity }}
+        </span>
+        <span class="action-label">{{ incident.action }}</span>
+        {% if incident.result.success %}
+        <span class="result success">Recovery successful</span>
+        {% else %}
+        <span class="result failed">Recovery failed</span>
+        {% endif %}
+    </div>
+    <time datetime="{{ incident.timestamp }}">{{ incident.display_timestamp }}</time>
+</section>
+
+<section class="incident-detail-grid">
+    <article class="panel detail-panel logs-panel">
+        <div class="panel-header">
+            <div>
+                <p class="panel-kicker">Observer</p>
+                <h2>Container logs</h2>
+            </div>
+        </div>
+        {% if incident.logs %}
+        <pre class="log-viewer"><code>{{ incident.logs }}</code></pre>
+        {% else %}
+        <div class="compact-empty">
+            <p>No raw logs stored.</p>
+            <small>This incident predates detailed log persistence.</small>
+        </div>
+        {% endif %}
+    </article>
+
+    <article class="panel detail-panel">
+        <div class="panel-header">
+            <div>
+                <p class="panel-kicker">Reasoner</p>
+                <h2>Diagnosis</h2>
+            </div>
+        </div>
+        <dl class="detail-list">
+            <div>
+                <dt>Root cause</dt>
+                <dd>{{ incident.root_cause }}</dd>
+            </div>
+            <div>
+                <dt>Severity</dt>
+                <dd>
+                    <span class="badge severity-{{ incident.severity | lower }}">
+                        {{ incident.severity }}
+                    </span>
+                </dd>
+            </div>
+            <div>
+                <dt>Detected errors</dt>
+                <dd>
+                    <div class="error-list">
+                        {% for error in incident.errors %}
+                        <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                </dd>
+            </div>
+        </dl>
+    </article>
+
+    <article class="panel detail-panel">
+        <div class="panel-header">
+            <div>
+                <p class="panel-kicker">Decision agent</p>
+                <h2>Decision</h2>
+            </div>
+        </div>
+        {% if incident.decision %}
+        <dl class="detail-list">
+            <div>
+                <dt>Final action</dt>
+                <dd><span class="action-label">{{ incident.decision.final_action }}</span></dd>
+            </div>
+            <div>
+                <dt>Approval</dt>
+                <dd>{{ "Approved" if incident.decision.approved else "Not approved" }}</dd>
+            </div>
+            <div>
+                <dt>Reason</dt>
+                <dd>{{ incident.decision.reason }}</dd>
+            </div>
+        </dl>
+        {% else %}
+        <div class="compact-empty">
+            <p>Decision details unavailable.</p>
+            <small>This incident predates detailed decision persistence.</small>
+        </div>
+        {% endif %}
+    </article>
+
+    <article class="panel detail-panel">
+        <div class="panel-header">
+            <div>
+                <p class="panel-kicker">Executor</p>
+                <h2>Recovery</h2>
+            </div>
+        </div>
+        <dl class="detail-list">
+            <div>
+                <dt>Outcome</dt>
+                <dd>
+                    {% if incident.result.success %}
+                    <span class="result success">Successful</span>
+                    {% else %}
+                    <span class="result failed">Failed</span>
+                    {% endif %}
+                </dd>
+            </div>
+            <div>
+                <dt>Action</dt>
+                <dd>{{ incident.action | title }}</dd>
+            </div>
+            <div>
+                <dt>Message</dt>
+                <dd>{{ incident.result.message or "No recovery message recorded." }}</dd>
+            </div>
+        </dl>
+    </article>
+
+    <article class="panel detail-panel timeline-panel">
+        <div class="panel-header">
+            <div>
+                <p class="panel-kicker">Agent lifecycle</p>
+                <h2>Recovery timeline</h2>
+            </div>
+        </div>
+        <ol class="recovery-timeline">
+            {% for event in incident.timeline %}
+            <li>
+                <time datetime="{{ event.timestamp }}" title="{{ event.display_timestamp }}">
+                    {{ event.display_time }}
+                </time>
+                <span class="timeline-marker"></span>
+                <div>
+                    <strong>{{ event.event }}</strong>
+                    <p>{{ event.detail }}</p>
+                </div>
+            </li>
+            {% endfor %}
+        </ol>
+    </article>
+</section>
+{% endblock %}
