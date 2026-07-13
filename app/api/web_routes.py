@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app.ai import ai_service
 from app.services.analytics_service import calculate_incident_analytics
 from app.services.database_service import fetch_incident, fetch_incidents
 from app.services.docker_service import (
@@ -77,12 +78,73 @@ def _dashboard_metrics() -> dict[str, Any]:
     active_containers = (
         get_active_container_names() if docker_connected else []
     )
+    ai_engine = ai_service.health()
+    latest_incident = incidents[0] if incidents else None
+
     return {
         "incidents": incidents,
         "analytics": analytics,
         "docker_connected": docker_connected,
         "active_containers": active_containers,
+        "ai_engine": ai_engine,
+        "latest_ai_decision": _latest_ai_decision(latest_incident),
     }
+
+
+def _latest_ai_decision(incident: dict[str, Any] | None) -> dict[str, Any] | None:
+    if incident is None:
+        return None
+
+    return {
+        "container": incident["container"],
+        "root_cause": incident["root_cause"],
+        "action": incident["action"],
+        "severity": incident["severity"],
+        "confidence": incident.get("confidence", 0),
+        "provider": incident.get("llm_provider") or "ollama",
+        "model": incident.get("llm_model") or "unknown",
+    }
+
+
+def _agent_statuses(incident: dict[str, Any]) -> list[dict[str, str]]:
+    decision = incident.get("decision") or {}
+    result = incident.get("execution_result") or incident.get("result") or {}
+
+    return [
+        {
+            "agent": "Observer",
+            "status": "Completed",
+            "detail": f"{len(incident.get('detected_errors') or incident.get('errors') or [])} error patterns detected",
+        },
+        {
+            "agent": "Reasoner",
+            "status": (
+                "Ollama response received"
+                if incident.get("llm_response")
+                else "AI unavailable"
+            ),
+            "detail": incident.get("root_cause", "No diagnosis recorded"),
+        },
+        {
+            "agent": "Decision",
+            "status": f"{decision.get('final_action', incident.get('action', 'unknown')).title()} selected",
+            "detail": decision.get("reason", "No decision reason recorded"),
+        },
+        {
+            "agent": "Executor",
+            "status": (
+                "Recovery successful"
+                if result.get("success")
+                else "Recovery failed"
+            ),
+            "detail": result.get("message", "No execution result recorded"),
+        },
+        {
+            "agent": "Memory",
+            "status": "Incident persisted",
+            "detail": f"SQLite incident #{incident['id']}",
+        },
+    ]
 
 
 @router.get("/", response_class=HTMLResponse, name="dashboard")
@@ -105,6 +167,8 @@ def dashboard(request: Request) -> HTMLResponse:
                 metrics["incidents"][:6]
             ),
             "problematic_containers": analytics["container_breakdown"][:5],
+            "ai_engine": metrics["ai_engine"],
+            "latest_ai_decision": metrics["latest_ai_decision"],
         },
     )
 
@@ -125,6 +189,23 @@ def dashboard_metrics(response: Response) -> dict[str, Any]:
         "most_problematic_container": (
             analytics["most_problematic_container"] or "None"
         ),
+        "ai_engine_status": (
+            "online" if metrics["ai_engine"]["available"] else "unavailable"
+        ),
+        "ai_engine_model": metrics["ai_engine"]["model"],
+        "latest_ai_decision": metrics["latest_ai_decision"],
+        "recent_incidents": [
+            {
+                "id": incident["id"],
+                "container": incident["container"],
+                "root_cause": incident["root_cause"],
+                "severity": incident["severity"],
+                "action": incident["action"],
+                "success": bool(incident["result"].get("success")),
+                "display_timestamp": incident["display_timestamp"],
+            }
+            for incident in _prepare_incidents(metrics["incidents"][:6])
+        ],
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -176,6 +257,7 @@ def incident_detail(request: Request, incident_id: int) -> HTMLResponse:
         context={
             **_base_context(request, "history"),
             "incident": prepared_incident,
+            "agent_statuses": _agent_statuses(prepared_incident),
         },
     )
 

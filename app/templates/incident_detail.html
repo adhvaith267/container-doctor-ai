@@ -3,7 +3,7 @@
 {% block title %}Incident #{{ incident.id }} · ContainerDoctor AI{% endblock %}
 {% block eyebrow %}Incident #{{ incident.id }}{% endblock %}
 {% block heading %}{{ incident.container }}{% endblock %}
-{% block description %}A complete view of detection, diagnosis, decision, and recovery.{% endblock %}
+{% block page_description %}<p class="page-description">Observer → Ollama Reasoner → Decision → Executor → Memory, with structured stage data.</p>{% endblock %}
 
 {% block content %}
 <a class="back-link" href="{{ url_for('incident_history') }}">← Back to incident history</a>
@@ -28,8 +28,13 @@
         <div class="panel-header">
             <div>
                 <p class="panel-kicker">Observer</p>
-                <h2>Container logs</h2>
+                <h2>Raw logs</h2>
             </div>
+        </div>
+        <div class="error-list detail-errors">
+            {% for error in incident.detected_errors or incident.errors %}
+            <span>{{ error }}</span>
+            {% endfor %}
         </div>
         {% if incident.logs %}
         <pre class="log-viewer"><code>{{ incident.logs }}</code></pre>
@@ -44,8 +49,88 @@
     <article class="panel detail-panel">
         <div class="panel-header">
             <div>
-                <p class="panel-kicker">Reasoner</p>
-                <h2>Diagnosis</h2>
+                <p class="panel-kicker">AI Reasoner</p>
+                <h2>Ollama diagnosis</h2>
+            </div>
+        </div>
+        <dl class="detail-list">
+            <div>
+                <dt>Provider</dt>
+                <dd>{{ incident.llm_provider or "ollama" }}</dd>
+            </div>
+            <div>
+                <dt>Model</dt>
+                <dd>{{ incident.llm_model or "Unknown" }}</dd>
+            </div>
+            <div>
+                <dt>Confidence</dt>
+                <dd>{{ "%.0f"|format((incident.confidence or 0) * 100) }}%</dd>
+            </div>
+            <div>
+                <dt>Latency</dt>
+                <dd>{{ incident.llm_latency or 0 }}s</dd>
+            </div>
+            <div>
+                <dt>Root cause</dt>
+                <dd>{{ incident.root_cause }}</dd>
+            </div>
+            <div>
+                <dt>Severity</dt>
+                <dd>
+                    <span class="badge severity-{{ incident.severity | lower }}">
+                        {{ incident.severity }}
+                    </span>
+                </dd>
+            </div>
+            <div>
+                <dt>Action</dt>
+                <dd><span class="action-label">{{ incident.action }}</span></dd>
+            </div>
+        </dl>
+
+        <div class="llm-artifacts">
+            <h3>Prompt</h3>
+            {% if incident.prompt %}
+            <pre class="log-viewer compact-log"><code>{{ incident.prompt }}</code></pre>
+            {% else %}
+            <p class="muted-text">Prompt was not captured for this incident.</p>
+            {% endif %}
+
+            <h3>Raw LLM response</h3>
+            {% if incident.llm_response %}
+            <pre class="log-viewer compact-log"><code>{{ incident.llm_response }}</code></pre>
+            {% else %}
+            <p class="muted-text">No Ollama response was recorded.</p>
+            {% endif %}
+        </div>
+    </article>
+
+    <article class="panel detail-panel">
+        <div class="panel-header">
+            <div>
+                <p class="panel-kicker">Agent status</p>
+                <h2>Lifecycle status</h2>
+            </div>
+        </div>
+        <div class="agent-status-list">
+            {% for item in agent_statuses %}
+            <div class="agent-status-item">
+                <span class="status-dot"></span>
+                <div>
+                    <strong>{{ item.agent }}</strong>
+                    <p>{{ item.status }}</p>
+                    <small>{{ item.detail }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel detail-panel">
+        <div class="panel-header">
+            <div>
+                <p class="panel-kicker">Parsed diagnosis</p>
+                <h2>Normalized output</h2>
             </div>
         </div>
         <dl class="detail-list">
@@ -62,14 +147,8 @@
                 </dd>
             </div>
             <div>
-                <dt>Detected errors</dt>
-                <dd>
-                    <div class="error-list">
-                        {% for error in incident.errors %}
-                        <span>{{ error }}</span>
-                        {% endfor %}
-                    </div>
-                </dd>
+                <dt>Recommended action</dt>
+                <dd><span class="action-label">{{ incident.action }}</span></dd>
             </div>
         </dl>
     </article>
@@ -115,7 +194,7 @@
             <div>
                 <dt>Outcome</dt>
                 <dd>
-                    {% if incident.result.success %}
+                    {% if incident.execution_result.success %}
                     <span class="result success">Successful</span>
                     {% else %}
                     <span class="result failed">Failed</span>
@@ -123,12 +202,39 @@
                 </dd>
             </div>
             <div>
-                <dt>Action</dt>
-                <dd>{{ incident.action | title }}</dd>
+                <dt>Executed action</dt>
+                <dd>{{ incident.execution_result.executed_action or incident.action | title }}</dd>
             </div>
             <div>
                 <dt>Message</dt>
-                <dd>{{ incident.result.message or "No recovery message recorded." }}</dd>
+                <dd>{{ incident.execution_result.message or "No recovery message recorded." }}</dd>
+            </div>
+            <div>
+                <dt>Container status</dt>
+                <dd>{{ incident.execution_result.container_status or "Unknown" }}</dd>
+            </div>
+        </dl>
+    </article>
+
+    <article class="panel detail-panel">
+        <div class="panel-header">
+            <div>
+                <p class="panel-kicker">Memory</p>
+                <h2>SQLite record</h2>
+            </div>
+        </div>
+        <dl class="detail-list">
+            <div>
+                <dt>Incident ID</dt>
+                <dd>#{{ incident.id }}</dd>
+            </div>
+            <div>
+                <dt>Timestamp</dt>
+                <dd>{{ incident.display_timestamp }}</dd>
+            </div>
+            <div>
+                <dt>Storage</dt>
+                <dd>app/db/sqlite.db</dd>
             </div>
         </dl>
     </article>

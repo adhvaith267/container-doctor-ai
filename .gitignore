@@ -1,7 +1,8 @@
 venv/
+.venv/
 __pycache__/
 *.pyc
+*.db-wal
+*.db-shm
 .env
-*.db
-.vscode/
-.idea/
+.pytest_cache/

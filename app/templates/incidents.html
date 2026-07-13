@@ -1,24 +1,24 @@
 {% extends "base.html" %}
 
 {% block title %}Incident History · ContainerDoctor AI{% endblock %}
-{% block eyebrow %}Persistent memory{% endblock %}
+{% block eyebrow %}Recovery archive{% endblock %}
 {% block heading %}Incident history{% endblock %}
-{% block description %}Every diagnosis, decision, and recovery result stored by the agent.{% endblock %}
+{% block page_description %}<p class="page-description">Every detected signal, diagnosis, decision, and recovery outcome in one searchable operational record.</p>{% endblock %}
 
 {% block content %}
 <section class="summary-strip">
     <div>
-        <span>Recorded incidents</span>
+        <span>Recovery records</span>
         <strong>{{ incidents | length }}</strong>
     </div>
-    <p>Newest incidents appear first. Records persist across agent restarts.</p>
+    <p>Newest first · persisted in SQLite across agent restarts</p>
 </section>
 
 <section class="panel">
     <div class="panel-header">
         <div>
-            <p class="panel-kicker">SQLite memory</p>
-            <h2>All incidents</h2>
+            <p class="panel-kicker">Operational audit trail</p>
+            <h2>Incident records</h2>
         </div>
         <span class="count-pill">{{ incidents | length }} total</span>
     </div>
@@ -30,8 +30,8 @@
                 <tr>
                     <th>ID</th>
                     <th>Container</th>
-                    <th>Detected errors</th>
-                    <th>Root cause</th>
+                    <th>Signals</th>
+                    <th>Diagnosis</th>
                     <th>Severity</th>
                     <th>Action</th>
                     <th>Result</th>
@@ -48,14 +48,14 @@
                             {{ incident.container }}
                         </a>
                     </td>
-                    <td>
+                    <td class="signal-cell">
                         <div class="error-list">
                             {% for error in incident.errors %}
                             <span>{{ error }}</span>
                             {% endfor %}
                         </div>
                     </td>
-                    <td>{{ incident.root_cause }}</td>
+                    <td class="diagnosis-cell"><strong>{{ incident.root_cause }}</strong></td>
                     <td>
                         <span class="badge severity-{{ incident.severity | lower }}">
                             {{ incident.severity }}
@@ -71,8 +71,8 @@
                     </td>
                     <td class="timestamp">{{ incident.display_timestamp }}</td>
                     <td>
-                        <a class="detail-link" href="{{ url_for('incident_detail', incident_id=incident.id) }}">
-                            View →
+                        <a class="detail-link detail-button" href="{{ url_for('incident_detail', incident_id=incident.id) }}">
+                            Inspect <span aria-hidden="true">→</span>
                         </a>
                     </td>
                 </tr>
@@ -83,7 +83,7 @@
     {% else %}
     <div class="empty-state">
         <span class="empty-icon" aria-hidden="true">◎</span>
-        <h3>Your incident history is empty</h3>
+        <h3>No incident records yet</h3>
         <p>Once the observer detects an issue, the full recovery cycle will be recorded here.</p>
     </div>
     {% endif %}

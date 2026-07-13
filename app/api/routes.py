@@ -21,12 +21,20 @@ class IncidentResponse(BaseModel):
     id: int
     container: str
     errors: list[str]
+    detected_errors: list[str]
     logs: str
+    prompt: str
+    llm_provider: str
+    llm_model: str
+    llm_latency: float = Field(ge=0.0)
+    llm_response: str
+    confidence: float = Field(ge=0.0, le=1.0)
     root_cause: str
     severity: str
     action: str
     decision: dict[str, Any]
     result: dict[str, Any]
+    execution_result: dict[str, Any]
     timeline: list[dict[str, Any]]
     timestamp: str
 

@@ -12,10 +12,12 @@
     <div class="app-shell">
         <aside class="sidebar">
             <a class="brand" href="{{ url_for('dashboard') }}">
-                <span class="brand-mark" aria-hidden="true">CD</span>
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 8h10M7 12h4M7 16h6"/></svg>
+                </span>
                 <span>
                     <strong>ContainerDoctor</strong>
-                    <small>Autonomous Container Recovery</small>
+                    <small>Autonomous recovery</small>
                 </span>
             </a>
 
@@ -25,62 +27,48 @@
                     class="{% if active_page == 'dashboard' %}active{% endif %}"
                     {% if active_page == 'dashboard' %}aria-current="page"{% endif %}
                 >
-                    <span class="nav-icon" aria-hidden="true">⌂</span>
-                    Overview
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+                    Dashboard
                 </a>
                 <a
                     href="{{ url_for('incident_history') }}"
                     class="{% if active_page == 'history' %}active{% endif %}"
                     {% if active_page == 'history' %}aria-current="page"{% endif %}
                 >
-                    <span class="nav-icon" aria-hidden="true">≡</span>
-                    Incidents
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg></span>
+                    Incident history
                 </a>
                 <a
                     href="{{ url_for('analytics_dashboard') }}"
                     class="{% if active_page == 'analytics' %}active{% endif %}"
                     {% if active_page == 'analytics' %}aria-current="page"{% endif %}
                 >
-                    <span class="nav-icon" aria-hidden="true">↗</span>
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"/></svg></span>
                     Analytics
                 </a>
             </nav>
 
-            <div class="agent-state">
-                <span class="agent-state-copy">
-                    <small>System Status</small>
-                    <strong>
-                        <span class="status-dot"></span>
-                        AI Agent Online
-                    </strong>
-                </span>
+            <div class="sidebar-footer">
+                <span class="sidebar-footer-label">ContainerDoctor AI</span>
+                <span>Observe · Reason · Recover</span>
             </div>
         </aside>
 
         <main class="main-content">
             <header class="page-header">
                 <div>
-                    <p class="eyebrow">{% block eyebrow %}Operations{% endblock %}</p>
+                    <p class="eyebrow">{% block eyebrow %}Container operations{% endblock %}</p>
                     <h1>{% block heading %}Dashboard{% endblock %}</h1>
-                    <p class="page-description">
-                        {% block description %}Container health and autonomous recovery at a glance.{% endblock %}
-                    </p>
-                </div>
-                <div
-                    class="docker-status {% if docker_connected %}connected{% else %}unavailable{% endif %}"
-                    data-docker-status
-                >
-                    <span class="status-dot"></span>
-                    <span data-docker-label>
-                        {% if docker_connected %}Docker Connected{% else %}Docker Unavailable{% endif %}
-                    </span>
+                    {% block page_description %}
+                    <p class="page-description">Container health and autonomous recovery at a glance.</p>
+                    {% endblock %}
                 </div>
             </header>
 
             {% block content %}{% endblock %}
 
             <footer class="page-footer">
-                ContainerDoctor AI · Observe → Reason → Decide → Act → Learn
+                ContainerDoctor AI
             </footer>
         </main>
     </div>

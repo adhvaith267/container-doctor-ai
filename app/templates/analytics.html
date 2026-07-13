@@ -1,29 +1,29 @@
 {% extends "base.html" %}
 
 {% block title %}Analytics · ContainerDoctor AI{% endblock %}
-{% block eyebrow %}Recovery intelligence{% endblock %}
-{% block heading %}Incident analytics{% endblock %}
-{% block description %}Patterns across container failures, severity, and automated actions.{% endblock %}
+{% block eyebrow %}Reliability engineering{% endblock %}
+{% block heading %}Analytics{% endblock %}
+{% block page_description %}<p class="page-description">Failure concentration, recovery performance, and decision quality across the monitored environment.</p>{% endblock %}
 
 {% block content %}
-<section class="metric-grid analytics-metrics" aria-label="Analytics summary">
+<section class="metric-grid analytics-metrics" aria-label="Reliability metrics">
     <article class="metric-card accent-violet">
-        <div class="metric-label">Total incidents</div>
+        <div class="metric-label">Event volume</div>
         <strong class="metric-value">{{ analytics.total_incidents }}</strong>
-        <span class="metric-detail">Across all containers</span>
+        <span class="metric-detail">Recorded incident events</span>
     </article>
     <article class="metric-card accent-green">
-        <div class="metric-label">Restart success</div>
+        <div class="metric-label">Automated recovery rate</div>
         <strong class="metric-value">{{ analytics.restart_success_rate }}%</strong>
-        <span class="metric-detail">Automated recoveries</span>
+        <span class="metric-detail">Successful restarts / attempts</span>
     </article>
     <article class="metric-card accent-blue">
-        <div class="metric-label">Restart attempts</div>
+        <div class="metric-label">Recovery executions</div>
         <strong class="metric-value">{{ analytics.restart_attempts }}</strong>
         <span class="metric-detail">{{ analytics.successful_restarts }} successful</span>
     </article>
     <article class="metric-card accent-amber">
-        <div class="metric-label">Top container</div>
+        <div class="metric-label">Highest-risk workload</div>
         <strong class="metric-value metric-text">
             {{ analytics.most_problematic_container or "None" }}
         </strong>
@@ -31,12 +31,12 @@
     </article>
 </section>
 
-<section class="analytics-grid">
+<section class="analytics-grid technical-analytics-grid">
     <article class="panel chart-panel">
         <div class="panel-header">
             <div>
-                <p class="panel-kicker">Frequency</p>
-                <h2>Incidents by container</h2>
+                <p class="panel-kicker">Failure distribution</p>
+                <h2>Workload risk profile</h2>
             </div>
         </div>
         {% if analytics.container_breakdown %}
@@ -50,7 +50,7 @@
                 <div class="progress-track large">
                     <span style="--bar-width: {{ item.percentage }}%"></span>
                 </div>
-                <small>{{ item.percentage }}% of incidents</small>
+                <small>{{ item.percentage }}% of all detected incidents</small>
             </div>
             {% endfor %}
         </div>
@@ -65,12 +65,12 @@
     <article class="panel chart-panel">
         <div class="panel-header">
             <div>
-                <p class="panel-kicker">Risk profile</p>
-                <h2>Severity distribution</h2>
+                <p class="panel-kicker">Impact breakdown</p>
+                <h2>Severity composition</h2>
             </div>
         </div>
         {% if analytics.severity_breakdown %}
-        <div class="distribution-list">
+        <div class="distribution-list severity-distribution">
             {% for item in analytics.severity_breakdown %}
             <div class="distribution-item">
                 <span class="distribution-dot severity-bg-{{ item.name }}"></span>
@@ -93,8 +93,8 @@
     <article class="panel chart-panel">
         <div class="panel-header">
             <div>
-                <p class="panel-kicker">Agent decisions</p>
-                <h2>Action distribution</h2>
+                <p class="panel-kicker">Mitigation strategy</p>
+                <h2>Decision distribution</h2>
             </div>
         </div>
         {% if analytics.action_breakdown %}
@@ -117,5 +117,6 @@
         </div>
         {% endif %}
     </article>
+
 </section>
 {% endblock %}
