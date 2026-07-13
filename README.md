@@ -46,36 +46,54 @@ observe  →  reason  →  decide  →  act  →  remember
 
 ## Architecture
 
-```
- Docker Containers
-        │  logs (Docker SDK)
-        ▼
-   Observer  ──────────────► detects errors, builds incident
-        │
-        ▼
-   Reasoner  ──────────────► delegates to AI Service
-        │
-        ▼
-   AI Service ─────────────► builds prompt, parses & validates response
-        │
-        ▼
-     Ollama  ──────────────► local LLM (default: qwen2.5:7b)
-        │
-        ▼
-   Decision  ──────────────► approves the action, enforces restart cap
-        │
-        ▼
-   Executor  ──────────────► restarts container or raises an alert
-        │              │
-        │              └──► Notification Service (Console / Email / Slack / Discord)
-        ▼
-    Memory   ──────────────► suppression check + persistence
-        │
-        ▼
-    SQLite (app/db/sqlite.db)
-        │
-        ▼
-   Dashboard (FastAPI + Jinja2)
+```mermaid
+flowchart TD
+    Docker["🐳 Docker Containers"]
+
+    subgraph Pipeline["Agent Pipeline (app/agents)"]
+        direction TB
+        Observer["Observer\ndetects errors, builds incident"]
+        Reasoner["Reasoner\ndelegates to AI Service"]
+        Decision["Decision\napproves action, enforces restart cap"]
+        Executor["Executor\nrestarts container / raises alert"]
+        Memory["Memory\nsuppression check + persistence"]
+    end
+
+    subgraph AI["AI Subsystem (app/ai)"]
+        direction TB
+        AIService["AI Service\nbuilds prompt, parses & validates"]
+        Ollama["Ollama LLM\ndefault: qwen2.5:7b"]
+    end
+
+    Notify["Notification Service\nConsole / Email / Slack / Discord"]
+    DB[("SQLite\napp/db/sqlite.db")]
+    Dashboard["Dashboard\nFastAPI + Jinja2"]
+
+    Docker -->|logs via Docker SDK| Observer
+    Observer --> Reasoner
+    Reasoner --> AIService
+    AIService --> Ollama
+    Ollama --> AIService
+    AIService --> Decision
+    Decision --> Executor
+    Executor --> Notify
+    Executor --> Memory
+    Memory --> DB
+    DB --> Dashboard
+
+    classDef docker fill:#2496ED,stroke:#0b3d66,color:#fff
+    classDef agent fill:#3776AB,stroke:#1c3e57,color:#fff
+    classDef ai fill:#111111,stroke:#000,color:#fff
+    classDef notify fill:#F5A623,stroke:#8a5a00,color:#111
+    classDef db fill:#003B57,stroke:#00131d,color:#fff
+    classDef dash fill:#009688,stroke:#00453d,color:#fff
+
+    class Docker docker
+    class Observer,Reasoner,Decision,Executor,Memory agent
+    class AIService,Ollama ai
+    class Notify notify
+    class DB db
+    class Dashboard dash
 ```
 
 ## Project Structure
