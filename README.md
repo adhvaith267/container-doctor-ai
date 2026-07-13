@@ -28,8 +28,6 @@ observe  →  reason  →  decide  →  act  →  remember
 - [Agent Workflow](#agent-workflow)
 - [Notifications](#notifications)
 - [Safety & Recovery Limits](#safety--recovery-limits)
-- [Roadmap](#roadmap)
-- [License](#license)
 
 ---
 
@@ -305,10 +303,6 @@ Sent as a rich embed:
 ### Email format
 
 Subject: `[<SEVERITY>] <title> — <container>`. Sent as a multipart message with both a plain-text body and an HTML alternative. Unlike Slack/Discord, the email body also includes the post-recovery **container status** and the **last 4,000 characters of logs** (HTML-escaped in the HTML alternative).
-
-### Common fields
-
-All channels draw from the same underlying payload: title (e.g. "Container recovery succeeded", "Critical container recovery failure", "Container alert requires attention"), container name, severity (forced to `critical` if the recovery failed, otherwise the AI's assessed severity), the AI's action and confidence (as a rounded percentage), root cause (or `"No AI diagnosis recorded."` if diagnosis failed), the recovery result message, and a UTC timestamp.
 
 ## Safety & Recovery Limits
 
