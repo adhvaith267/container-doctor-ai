@@ -1,16 +1,14 @@
+<div align="center">
 # ContainerDoctor AI
-
+**ContainerDoctor AI** is an autonomous Site Reliability Engineering (SRE) agent for Docker. It polls container logs on a fixed interval, detects failures via pattern matching, sends the incident to a locally-hosted LLM through [Ollama](https://ollama.com/) for diagnosis, decides on a recovery action, executes it, sends notifications, and persists the full incident to SQLite — all rendered through a FastAPI + Jinja2 dashboard.
+    
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-SDK-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-000000)](https://ollama.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite&logoColor=white)](https://sqlite.org/)
 
-**ContainerDoctor AI** is an autonomous Site Reliability Engineering (SRE) agent for Docker. It polls container logs on a fixed interval, detects failures via pattern matching, sends the incident to a locally-hosted LLM through [Ollama](https://ollama.com/) for diagnosis, decides on a recovery action, executes it, sends notifications, and persists the full incident to SQLite — all rendered through a FastAPI + Jinja2 dashboard.
-
-```
-observe  →  reason  →  decide  →  act  →  remember
-```
+</div>
 
 ---
 
