@@ -48,45 +48,23 @@ observe  →  reason  →  decide  →  act  →  remember
 
 ```mermaid
 flowchart TD
-    Docker["🐳 Docker Containers"]
-
-    subgraph Pipeline["Agent Pipeline (app/agents)"]
-        direction TB
-        Observer["Observer\ndetects errors, builds incident"]
-        Reasoner["Reasoner\ndelegates to AI Service"]
-        Decision["Decision\napproves action, enforces restart cap"]
-        Executor["Executor\nrestarts container / raises alert"]
-        Memory["Memory\nsuppression check + persistence"]
-    end
-
-    subgraph AI["AI Subsystem (app/ai)"]
-        direction TB
-        AIService["AI Service\nbuilds prompt, parses & validates"]
-        Ollama["Ollama LLM\ndefault: qwen2.5:7b"]
-    end
-
-    Notify["Notification Service\nConsole / Email / Slack / Discord"]
-    DB[("SQLite\napp/db/sqlite.db")]
-    Dashboard["Dashboard\nFastAPI + Jinja2"]
-
-    Docker -->|logs via Docker SDK| Observer
-    Observer --> Reasoner
-    Reasoner --> AIService
-    AIService --> Ollama
-    Ollama --> AIService
-    AIService --> Decision
-    Decision --> Executor
-    Executor --> Notify
-    Executor --> Memory
-    Memory --> DB
-    DB --> Dashboard
+    Docker["🐳 Docker Containers"] -->|logs via Docker SDK| Observer["Observer\ndetects errors, builds incident"]
+    Observer --> Reasoner["Reasoner\ndelegates to AI Service"]
+    Reasoner --> AIService["AI Service\nbuilds prompt, parses & validates"]
+    AIService <--> Ollama["Ollama LLM\ndefault: qwen2.5:7b"]
+    AIService --> Decision["Decision\napproves action, enforces restart cap"]
+    Decision --> Executor["Executor\nrestarts container / raises alert"]
+    Executor --> Notify["Notification Service\nConsole / Email / Slack / Discord"]
+    Executor --> Memory["Memory\nsuppression check + persistence"]
+    Memory --> DB[("SQLite\napp/db/sqlite.db")]
+    DB --> Dashboard["Dashboard\nFastAPI + Jinja2"]
 
     classDef docker fill:#2496ED,stroke:#0b3d66,color:#fff
     classDef agent fill:#3776AB,stroke:#1c3e57,color:#fff
     classDef ai fill:#111111,stroke:#000,color:#fff
     classDef notify fill:#F5A623,stroke:#8a5a00,color:#111
     classDef db fill:#003B57,stroke:#00131d,color:#fff
-    classDef dash fill:#009688,stroke:#00453d,color:#ffff
+    classDef dash fill:#009688,stroke:#00453d,color:#fff
 
     class Docker docker
     class Observer,Reasoner,Decision,Executor,Memory agent
@@ -321,6 +299,7 @@ Sent as a rich embed:
 ### Email format
 
 Subject: `[<SEVERITY>] <title> — <container>`. Sent as a multipart message with both a plain-text body and an HTML alternative. Unlike Slack/Discord, the email body also includes the post-recovery **container status** and the **last 4,000 characters of logs** (HTML-escaped in the HTML alternative).
+
 
 ## Safety & Recovery Limits
 
