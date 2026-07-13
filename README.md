@@ -6,9 +6,7 @@
 [![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-000000)](https://ollama.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite&logoColor=white)](https://sqlite.org/)
 
-**ContainerDoctor AI** is an autonomous Site Reliability Engineering (SRE) agent for Docker. It watches container logs, uses a locally-hosted LLM (via [Ollama](https://ollama.com/)) to diagnose failures, decides on a recovery action, executes it, and records the entire incident lifecycle in a browser dashboard — all without sending your logs to the cloud.
-
-Where a typical monitoring tool stops at "something broke," ContainerDoctor AI runs a full closed loop:
+**ContainerDoctor AI** is an autonomous Site Reliability Engineering (SRE) agent for Docker. It polls container logs on a fixed interval, detects failures via pattern matching, sends the incident to a locally-hosted LLM through [Ollama](https://ollama.com/) for diagnosis, decides on a recovery action, executes it, sends notifications, and persists the full incident to SQLite — all rendered through a FastAPI + Jinja2 dashboard.
 
 ```
 observe  →  reason  →  decide  →  act  →  remember
@@ -18,7 +16,6 @@ observe  →  reason  →  decide  →  act  →  remember
 
 ## Table of Contents
 
-- [Why ContainerDoctor AI](#why-containerdoctor-ai)
 - [Key Features](#key-features)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
@@ -29,33 +26,31 @@ observe  →  reason  →  decide  →  act  →  remember
 - [Dashboard & Web Routes](#dashboard--web-routes)
 - [REST API](#rest-api)
 - [Agent Workflow](#agent-workflow)
+- [Notifications](#notifications)
 - [Safety & Recovery Limits](#safety--recovery-limits)
 - [Roadmap](#roadmap)
 - [License](#license)
 
 ---
 
-## Why ContainerDoctor AI
-
-Most container monitoring stacks tell you *that* a container is unhealthy. ContainerDoctor AI goes a step further: it reads the actual runtime logs, asks a local LLM to reason about the root cause, and — within configurable safety limits — takes corrective action automatically, notifying you along the way. Because the reasoning model runs locally through Ollama, no incident data ever leaves your infrastructure.
-
 ## Key Features
 
-- **Continuous Docker monitoring** — polls configured containers on a fixed interval and pulls recent logs via the Docker SDK.
-- **AI-assisted root cause analysis** — sends structured incident context to a local LLM and validates its structured JSON response before trusting it.
-- **Autonomous decision engine** — turns a diagnosis into an approved action, capping repeated restarts to avoid restart loops.
-- **Automatic remediation** — executes restarts (or alerts) and records the outcome of every action taken.
-- **Multi-channel notifications** — Email, Slack, and Discord, each independently toggleable.
-- **Duplicate incident suppression** — a configurable time window prevents the same failure from re-triggering the pipeline repeatedly.
-- **Persistent incident history** — every cycle (logs, prompt, LLM response, decision, and result) is stored in SQLite.
-- **Analytics dashboard** — restart success rate, most problematic containers, and full incident timelines, rendered server-side with Jinja2.
-- **Local-first** — no cloud AI dependency; the only external services you opt into are your own notification webhooks.
+- **Continuous Docker monitoring** — polls each container in `TARGET_CONTAINERS` on a `CHECK_INTERVAL`, pulling the last `LOG_LINES` lines of logs via the Docker SDK.
+- **Keyword-based failure detection** — scans logs for a fixed set of error patterns before anything is sent to the LLM.
+- **AI-assisted root cause analysis** — builds a structured prompt, sends it to a local Ollama model, and parses/validates the JSON response before trusting it.
+- **Autonomous decision engine** — turns a diagnosis into an approved action, capping automatic restarts per container.
+- **Automatic remediation** — restarts unhealthy containers (or raises an alert) via the Docker SDK and records the outcome.
+- **Multi-channel notifications** — console logging (always on), plus optional Email, Slack, and Discord.
+- **Duplicate incident suppression** — a configurable time window prevents the same error signature from re-triggering the pipeline on every cycle.
+- **Persistent incident history** — every cycle (logs, prompt, raw LLM response, decision, execution result, and a per-stage timeline) is stored in SQLite.
+- **Analytics** — restart success rate, and per-container/severity/action breakdowns.
+- **Local-first** — the only network calls are to your own Docker daemon, your local Ollama instance, and whichever notification webhooks you enable.
 
 ## Architecture
 
 ```
  Docker Containers
-        │  logs
+        │  logs (Docker SDK)
         ▼
    Observer  ──────────────► detects errors, builds incident
         │
@@ -63,23 +58,23 @@ Most container monitoring stacks tell you *that* a container is unhealthy. Conta
    Reasoner  ──────────────► delegates to AI Service
         │
         ▼
-   AI Service ─────────────► prompts, parses & validates
+   AI Service ─────────────► builds prompt, parses & validates response
         │
         ▼
      Ollama  ──────────────► local LLM (default: qwen2.5:7b)
         │
         ▼
-   Decision  ──────────────► approves / caps the recovery action
+   Decision  ──────────────► approves the action, enforces restart cap
         │
         ▼
    Executor  ──────────────► restarts container or raises an alert
         │              │
-        │              └──► Notification Service (Email / Slack / Discord)
+        │              └──► Notification Service (Console / Email / Slack / Discord)
         ▼
     Memory   ──────────────► suppression check + persistence
         │
         ▼
-    SQLite
+    SQLite (app/db/sqlite.db)
         │
         ▼
    Dashboard (FastAPI + Jinja2)
@@ -90,46 +85,46 @@ Most container monitoring stacks tell you *that* a container is unhealthy. Conta
 ```
 app/
 ├── agents/            # Observe → Reason → Decide → Act → Remember pipeline
-│   ├── observer.py     # Pulls logs, detects errors, builds an incident
-│   ├── reasoner.py      # Delegates diagnosis to the AI service
-│   ├── decision.py      # Approves actions, enforces restart limits
-│   ├── executor.py      # Executes the approved action, fires notifications
-│   └── memory.py        # Suppression checks + incident persistence
-├── ai/                 # LLM integration
-│   ├── ollama_client.py  # HTTP client for the local Ollama server
-│   ├── prompts.py         # Diagnosis prompt construction
-│   ├── parser.py          # Parses raw LLM output into JSON
-│   ├── validator.py       # Validates/normalizes the diagnosis schema
-│   └── ai_service.py      # Orchestrates prompt → call → parse → validate
+│   ├── observer.py       # Pulls logs per container, detects errors, builds an incident
+│   ├── reasoner.py        # Delegates diagnosis to app.ai.ai_service
+│   ├── decision.py        # Approves the AI's action, enforces the restart cap
+│   ├── executor.py        # Executes the approved action, triggers notifications
+│   └── memory.py          # Suppression check + incident persistence
+├── ai/                  # LLM integration
+│   ├── ollama_client.py    # HTTP client for Ollama's /api/generate and /api/tags
+│   ├── prompts.py           # Diagnosis prompt template
+│   ├── parser.py            # Extracts a JSON object from raw LLM output
+│   ├── validator.py         # Validates/normalizes the diagnosis schema
+│   └── ai_service.py        # Orchestrates prompt → call → parse → validate; health check
 ├── api/
-│   ├── server.py        # FastAPI app factory, lifespan-managed monitor loop
-│   ├── routes.py         # JSON REST API (/health, /incidents, /analytics)
-│   └── web_routes.py     # Server-rendered dashboard routes
+│   ├── server.py           # FastAPI app factory; lifespan starts the background monitor
+│   ├── routes.py            # JSON REST API (/health, /incidents, /analytics)
+│   └── web_routes.py        # Server-rendered dashboard routes
 ├── services/
-│   ├── docker_service.py       # Docker SDK integration (logs, restarts, status)
-│   ├── log_service.py          # Error/failure detection in raw log text
-│   ├── monitor_service.py      # Runs and loops the agent pipeline
-│   ├── database_service.py     # SQLite schema, reads/writes for incidents
+│   ├── docker_service.py       # Docker SDK integration: logs, restart, connection/status
+│   ├── log_service.py          # Keyword-based error detection in raw log text
+│   ├── monitor_service.py      # Runs and loops the agent pipeline, tracks per-cycle metrics
+│   ├── database_service.py     # Raw sqlite3 schema, migrations, reads/writes for incidents
 │   ├── analytics_service.py    # Aggregate incident statistics
-│   └── notification_service.py # Email / Slack / Discord delivery
-├── templates/           # Jinja2 templates for the dashboard
-├── static/              # Dashboard CSS/JS
-├── db/                  # SQLite database file
-├── config.py            # Environment-driven configuration
-└── main.py              # Single-cycle entry point for local debugging
+│   └── notification_service.py # Console / Email / Slack / Discord delivery
+├── templates/            # Jinja2 templates (dashboard, history, incident detail, analytics)
+├── static/                # Dashboard CSS/JS
+├── db/                    # SQLite database file (sqlite.db)
+├── config.py              # Environment-driven configuration
+└── main.py                # Runs a single monitoring cycle for local debugging
 ```
 
 ## Technology Stack
 
-| Layer             | Technology                     |
-|-------------------|---------------------------------|
-| Backend           | FastAPI                         |
-| Language          | Python 3.11+                    |
-| AI / LLM          | Ollama (default model: `qwen2.5:7b`) |
-| Container Runtime | Docker SDK for Python            |
-| Database          | SQLite (via SQLAlchemy)          |
-| Frontend          | Jinja2, HTML, CSS, JavaScript     |
-| Notifications     | SMTP, Slack webhooks, Discord webhooks |
+| Layer             | Technology                              |
+|-------------------|-------------------------------------------|
+| Backend           | FastAPI                                    |
+| Language          | Python 3.11+                               |
+| AI / LLM          | Ollama (default model: `qwen2.5:7b`)        |
+| Container Runtime | Docker SDK for Python                       |
+| Database          | SQLite, via the standard library `sqlite3` module |
+| Frontend          | Jinja2 templates, HTML, CSS, JavaScript      |
+| Notifications     | SMTP (`smtplib`), Slack webhooks, Discord webhooks |
 
 ## Getting Started
 
@@ -137,7 +132,7 @@ app/
 
 - Python 3.11+
 - Docker Engine running locally, with the containers you want to monitor
-- [Ollama](https://ollama.com/) installed, with a model pulled
+- [Ollama](https://ollama.com/), with a model pulled
 
 ### Installation
 
@@ -158,7 +153,7 @@ ollama pull qwen2.5:7b
 
 ## Configuration
 
-ContainerDoctor AI is configured entirely through environment variables (loaded from a `.env` file via `python-dotenv`). Create a `.env` file in the project root:
+ContainerDoctor AI is configured entirely through environment variables, loaded via `python-dotenv`. Create a `.env` file in the project root:
 
 ```env
 # Container Monitoring
@@ -195,19 +190,24 @@ NOTIFICATION_TIMEOUT_SECONDS=10
 
 | Variable | Description | Default |
 |---|---|---|
-| `TARGET_CONTAINERS` | Comma-separated list of container names to monitor | *(empty)* |
+| `TARGET_CONTAINERS` | Comma-separated container names to monitor | *(empty)* |
 | `CHECK_INTERVAL` | Seconds between monitoring cycles | `10` |
-| `LOG_LINES` | Number of trailing log lines fetched per container | `50` |
-| `INCIDENT_SUPPRESSION_SECONDS` | Window during which a matching incident is suppressed as a duplicate | `300` |
-| `AUTO_FIX` | Whether the executor is allowed to take automatic recovery action | `true` |
-| `MAX_DIAGNOSES_PER_HOUR` | Upper bound on AI diagnoses per hour | `20` |
+| `LOG_LINES` | Trailing log lines fetched per container per cycle | `50` |
+| `INCIDENT_SUPPRESSION_SECONDS` | Window during which a matching error signature is suppressed as a duplicate | `300` |
+| `AUTO_FIX` | Read from the environment into config; not currently referenced elsewhere in the pipeline | `true` |
+| `MAX_DIAGNOSES_PER_HOUR` | Read from the environment into config; not currently referenced elsewhere in the pipeline | `20` |
+| `LLM_PROVIDER` | Read from the environment into config; `ai_service.py` currently always reports/uses the `ollama` provider | `ollama` |
 | `OLLAMA_BASE_URL` | Base URL of the local Ollama server | `http://127.0.0.1:11434` |
-| `OLLAMA_MODEL` | Ollama model used for diagnosis | `qwen2.5:7b` |
+| `OLLAMA_MODEL` | Ollama model used for diagnosis and health checks | `qwen2.5:7b` |
+| `OLLAMA_TIMEOUT_SECONDS` | Request timeout for Ollama calls (health checks cap this at 1.5s) | `60` |
 | `EMAIL_ENABLED` / `SLACK_ENABLED` / `DISCORD_ENABLED` | Enable each notification channel independently | `false` |
+| `NOTIFICATION_TIMEOUT_SECONDS` | Timeout for SMTP connections and webhook POST requests | `10` |
+
+> `AUTO_FIX`, `MAX_DIAGNOSES_PER_HOUR`, and `LLM_PROVIDER` are parsed into `config.py` but are not read anywhere else in the current codebase — they're listed here for completeness, not as documented behavior.
 
 ## Running the Service
 
-Start the FastAPI application (this also spins up the background monitoring loop via the app's lifespan handler):
+Start the FastAPI application. Its lifespan handler initializes the database and starts the background monitoring loop (`monitor_forever`) as an asyncio task:
 
 ```bash
 uvicorn app.api.server:app --reload
@@ -215,7 +215,7 @@ uvicorn app.api.server:app --reload
 
 Dashboard: [http://127.0.0.1:8000](http://127.0.0.1:8000)
 
-For a single, one-off monitoring cycle (useful for local debugging without the web server):
+For a single, one-off monitoring cycle without the web server (used for local debugging):
 
 ```bash
 python -m app.main
@@ -225,88 +225,97 @@ python -m app.main
 
 | Route | Description |
 |---|---|
-| `GET /` | Main dashboard — system overview, AI engine status, live metrics |
-| `GET /dashboard/metrics` | Partial/AJAX endpoint powering live dashboard updates |
+| `GET /` | Main dashboard — Docker connection status, active containers, recent incidents (last 6), top 5 problematic containers, AI engine health, and the latest AI decision |
+| `GET /dashboard/metrics` | Same dashboard data as JSON, with `Cache-Control: no-store` (used to refresh the dashboard) |
 | `GET /history` | Full incident history list |
-| `GET /history/{incident_id}` | Incident detail view, including AI reasoning and per-stage timeline |
-| `GET /analytics-dashboard` | Aggregate analytics — restart success rate, most problematic containers |
+| `GET /history/{incident_id}` | Incident detail view, including a reconstructed per-agent status (Observer, Reasoner, Decision, Executor, Memory) and the stage timeline |
+| `GET /analytics-dashboard` | Aggregate analytics view |
 
 ## REST API
 
 | Method & Path | Description |
 |---|---|
-| `GET /health` | Docker connection status, monitored containers, total incident count |
-| `GET /incidents` | Full list of stored incidents (logs, diagnosis, decision, result, timeline) |
+| `GET /health` | Docker connection status (`connected`/`unavailable`), monitored container names, total incident count |
+| `GET /incidents` | Full list of stored incidents (errors, logs, prompt, raw LLM response, confidence, decision, execution result, timeline) |
 | `GET /analytics` | Total incidents, restart success rate, most problematic container |
 
 Interactive OpenAPI docs are available at `/docs` once the server is running.
 
+## Agent Workflow
+
+Each cycle (`run_monitoring_cycle`) does the following per detected incident:
+
+1. **Observe** — for each container in `TARGET_CONTAINERS`, fetch the last `LOG_LINES` log lines and scan them for error keywords.
+2. **Build incident** — package the container name, the last 10 log lines, detected error keywords, and a detection timestamp.
+3. **Suppress duplicates** — if a matching error signature was already recorded for this container within `INCIDENT_SUPPRESSION_SECONDS`, skip the rest of the cycle for this incident.
+4. **Reason** — send the incident to the local LLM via `ai_service.diagnose()`.
+5. **Parse & validate** — extract a JSON object from the raw model output and validate it against the expected schema (`root_cause`, `severity`, `action`, `confidence`).
+6. **Decide** — approve the action; a `restart` action is only approved if the container hasn't already been auto-restarted 3 times.
+7. **Execute** — restart the container (or mark an alert) via the Docker SDK, and record the result.
+8. **Notify** — send the outcome through the console, and any of Email/Slack/Discord that are enabled.
+9. **Remember** — persist the full incident, diagnosis, decision, execution result, and timeline to SQLite.
+10. **Visualize** — the dashboard and history views reflect the updated incidents on their next load.
+
+Each stage's outcome is recorded as a timeline entry (e.g. "Incident detected", "LLM analysis complete" / "AI unavailable", "Decision made", "`<Action>` initiated", and a final outcome event), which is what powers the per-incident timeline in the dashboard.
+
 ## Notifications
 
-Every completed recovery attempt — success, failure, or an escalated alert — is sent through `notification_service.send_notification()`. Delivery is **best-effort**: each channel is wrapped so a webhook timeout or SMTP error is logged and swallowed, never raised back into the recovery pipeline.
-
-Three channels are supported, each toggled independently via config:
+Every completed recovery attempt is sent through `notification_service.send_notification()`. Delivery is **best-effort**: a failed webhook or SMTP call is caught and logged, never raised back into the recovery pipeline.
 
 | Channel | Enable flag | Required settings | Delivery |
 |---|---|---|---|
-| Console | always on | — | Structured log line for every notification event |
-| Email | `EMAIL_ENABLED` | `SMTP_HOST`, `EMAIL_FROM`, `EMAIL_TO` (comma-separated), optional `SMTP_USERNAME`/`SMTP_PASSWORD` | Multipart message (plain text + HTML) over SMTP; uses implicit TLS on port `465`, otherwise STARTTLS |
-| Slack | `SLACK_ENABLED` | `SLACK_WEBHOOK_URL` | Formatted message via Slack incoming webhook |
-| Discord | `DISCORD_ENABLED` | `DISCORD_WEBHOOK_URL` | Rich embed via Discord webhook |
+| Console | always on | — | A structured log line for every notification event |
+| Email | `EMAIL_ENABLED` | `SMTP_HOST`, `EMAIL_FROM`, at least one address in `EMAIL_TO` | Multipart message (plain text + HTML) over SMTP; implicit TLS on port `465`, otherwise STARTTLS |
+| Slack | `SLACK_ENABLED` | `SLACK_WEBHOOK_URL` | A single formatted `text` message via Slack's incoming webhook |
+| Discord | `DISCORD_ENABLED` | `DISCORD_WEBHOOK_URL` | A rich embed via Discord's webhook API |
 
-**Console logging always runs**, regardless of which channels are enabled, so every notification event is visible in the application logs even with no webhooks configured.
+### Status indicator
 
-### What's in a notification
+Slack and Discord messages both open with a Slack-style emoji shortcode selected by severity/outcome:
 
-Every message (regardless of channel) carries the same underlying payload:
+| Condition | Shortcode |
+|---|---|
+| Recovery failed, or severity is `critical` | `:rotating_light:` |
+| Severity is `high` | `:warning:` |
+| Otherwise | `:white_check_mark:` |
 
-- **Title** — e.g. "Container recovery succeeded", "Critical container recovery failure", "Container alert requires attention"
-- **Container** name
-- **Severity** — `critical` when the recovery failed, otherwise the AI's assessed severity
-- **AI decision** — the final action taken (`restart`, `alert`, `ignore`) and the model's confidence, as a percentage
-- **Root cause** — the AI's diagnosis, or `"No AI diagnosis recorded."` if diagnosis failed
-- **Recovery result** — outcome message and container status after the action
-- **Recent logs** — up to the last 4,000 characters (Email only)
-- **Timestamp** — UTC, human-readable
+### Slack message format
 
-Slack and Discord messages use a status indicator (✅ / ⚠️ / 🚨) driven by severity and success; Discord additionally colors the embed green on success and red on failure.
+Sent as a single `text` field:
 
-### Example
-
-```env
-SLACK_ENABLED=true
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz
-
-DISCORD_ENABLED=true
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/xxx/yyy
-
-EMAIL_ENABLED=true
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=alerts@example.com
-SMTP_PASSWORD=app-specific-password
-EMAIL_FROM=alerts@example.com
-EMAIL_TO=oncall@example.com,team@example.com
+```
+:emoji: *<title>*
+*Container:* `<container>`
+*Severity:* <SEVERITY>
+*Root cause:* <root_cause>
+*AI decision:* <Action> (<confidence>% confidence)
+*Recovery:* <recovery result message>
+*Time:* <UTC timestamp>
 ```
 
-Any channel left disabled (or missing its required settings) is skipped silently with a warning in the logs — the notification call itself never fails the recovery cycle.
+### Discord message format
 
-## Agent Workflow
+Sent as a rich embed:
 
-1. **Observe** — pull recent logs for each monitored container.
-2. **Detect** — scan logs for runtime failure patterns.
-3. **Build incident** — package the container name, logs, and detected errors.
-4. **Reason** — send the incident to the local LLM via Ollama.
-5. **Parse & validate** — turn the raw LLM output into a validated diagnosis (root cause, severity, action, confidence).
-6. **Decide** — approve a recovery action, enforcing a restart cap to prevent restart loops.
-7. **Execute** — perform the restart (or raise an alert) and record the outcome.
-8. **Notify** — send the result over any enabled channel (Email, Slack, Discord).
-9. **Remember** — persist the full incident (including the AI's reasoning and the final result) to SQLite, subject to duplicate suppression.
-10. **Visualize** — the dashboard reflects the updated incident history and analytics.
+- **Title:** `:emoji: <title>`
+- **Color:** `#45D796` (green) on success, `#FF7186` (red) on failure
+- **Fields:** `Container`, `Severity`, and `AI decision` as inline fields; `Root cause` and `Recovery` as full-width fields
+- **Footer:** the UTC timestamp
+
+### Email format
+
+Subject: `[<SEVERITY>] <title> — <container>`. Sent as a multipart message with both a plain-text body and an HTML alternative. Unlike Slack/Discord, the email body also includes the post-recovery **container status** and the **last 4,000 characters of logs** (HTML-escaped in the HTML alternative).
+
+### Common fields
+
+All channels draw from the same underlying payload: title (e.g. "Container recovery succeeded", "Critical container recovery failure", "Container alert requires attention"), container name, severity (forced to `critical` if the recovery failed, otherwise the AI's assessed severity), the AI's action and confidence (as a rounded percentage), root cause (or `"No AI diagnosis recorded."` if diagnosis failed), the recovery result message, and a UTC timestamp.
 
 ## Safety & Recovery Limits
 
-- **Restart caps** — a container that has already been restarted 3 times is no longer auto-restarted; the decision engine instead escalates to an `alert` action.
-- **Duplicate suppression** — repeated detections of the same underlying failure within `INCIDENT_SUPPRESSION_SECONDS` are treated as one incident, not re-triggered on every cycle.
-- **Best-effort notifications** — notification failures never block or fail the recovery pipeline itself.
-- **Graceful AI degradation** — if Ollama is unreachable or returns an invalid diagnosis, the agent falls back to a critical "AI unavailable" diagnosis and alerts rather than guessing.
+- **Restart cap** — `decision.py` tracks restart counts per container in memory. Once a container has been auto-restarted 3 times, further `restart` diagnoses are downgraded to an `alert` action instead ("Restart limit exceeded").
+- **Restart verification** — `docker_service.restart_container()` issues the restart with a 30-second stop timeout, waits 5 seconds, reloads the container, and only reports success if its status is `running`.
+- **Duplicate suppression** — `has_recent_matching_incident()` compares the sorted, lowercased set of detected error keywords against the container's most recent incidents; a match within `INCIDENT_SUPPRESSION_SECONDS` is suppressed.
+- **Error keyword filtering** — `log_service.detect_errors()` matches against a fixed list of failure keywords (`error`, `exception`, `traceback`, `failed`, `crash`, `fatal`, `panic`, `segmentation fault`, `out of memory`, `killed`, `oomkiller`, `connection refused`), while lines containing `query timeout`, `timeout policy`, or `configuration` are ignored.
+- **Best-effort notifications** — notification failures are caught inside `executor._notify()` and never affect the recorded recovery result.
+- **Graceful AI degradation** — if Ollama is unreachable, times out, or returns output that fails parsing/validation, `ai_service.diagnose()` returns a fallback diagnosis (`root_cause: "AI unavailable"`, `severity: "critical"`, `action: "alert"`, `confidence: 0.0`) instead of raising.
+- **Cycle-level fault isolation** — an unhandled exception while processing one incident, or during the observer step, is logged and the monitoring loop continues rather than crashing.
