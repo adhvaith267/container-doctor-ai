@@ -86,7 +86,7 @@ flowchart TD
     classDef ai fill:#111111,stroke:#000,color:#fff
     classDef notify fill:#F5A623,stroke:#8a5a00,color:#111
     classDef db fill:#003B57,stroke:#00131d,color:#fff
-    classDef dash fill:#009688,stroke:#00453d,color:#fff
+    classDef dash fill:#009688,stroke:#00453d,color:#ffff
 
     class Docker docker
     class Observer,Reasoner,Decision,Executor,Memory agent
