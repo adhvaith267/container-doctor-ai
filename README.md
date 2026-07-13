@@ -1,4 +1,5 @@
 <div align="center">
+    
 # ContainerDoctor AI
 **ContainerDoctor AI** is an autonomous Site Reliability Engineering (SRE) agent for Docker. It polls container logs on a fixed interval, detects failures via pattern matching, sends the incident to a locally-hosted LLM through [Ollama](https://ollama.com/) for diagnosis, decides on a recovery action, executes it, sends notifications, and persists the full incident to SQLite — all rendered through a FastAPI + Jinja2 dashboard.
     
