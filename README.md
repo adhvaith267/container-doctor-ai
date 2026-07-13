@@ -5,7 +5,6 @@
 [![Docker](https://img.shields.io/badge/Docker-SDK-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-000000)](https://ollama.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite&logoColor=white)](https://sqlite.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
 
 **ContainerDoctor AI** is an autonomous Site Reliability Engineering (SRE) agent for Docker. It watches container logs, uses a locally-hosted LLM (via [Ollama](https://ollama.com/)) to diagnose failures, decides on a recovery action, executes it, and records the entire incident lifecycle in a browser dashboard — all without sending your logs to the cloud.
 
@@ -242,6 +241,56 @@ python -m app.main
 
 Interactive OpenAPI docs are available at `/docs` once the server is running.
 
+## Notifications
+
+Every completed recovery attempt — success, failure, or an escalated alert — is sent through `notification_service.send_notification()`. Delivery is **best-effort**: each channel is wrapped so a webhook timeout or SMTP error is logged and swallowed, never raised back into the recovery pipeline.
+
+Three channels are supported, each toggled independently via config:
+
+| Channel | Enable flag | Required settings | Delivery |
+|---|---|---|---|
+| Console | always on | — | Structured log line for every notification event |
+| Email | `EMAIL_ENABLED` | `SMTP_HOST`, `EMAIL_FROM`, `EMAIL_TO` (comma-separated), optional `SMTP_USERNAME`/`SMTP_PASSWORD` | Multipart message (plain text + HTML) over SMTP; uses implicit TLS on port `465`, otherwise STARTTLS |
+| Slack | `SLACK_ENABLED` | `SLACK_WEBHOOK_URL` | Formatted message via Slack incoming webhook |
+| Discord | `DISCORD_ENABLED` | `DISCORD_WEBHOOK_URL` | Rich embed via Discord webhook |
+
+**Console logging always runs**, regardless of which channels are enabled, so every notification event is visible in the application logs even with no webhooks configured.
+
+### What's in a notification
+
+Every message (regardless of channel) carries the same underlying payload:
+
+- **Title** — e.g. "Container recovery succeeded", "Critical container recovery failure", "Container alert requires attention"
+- **Container** name
+- **Severity** — `critical` when the recovery failed, otherwise the AI's assessed severity
+- **AI decision** — the final action taken (`restart`, `alert`, `ignore`) and the model's confidence, as a percentage
+- **Root cause** — the AI's diagnosis, or `"No AI diagnosis recorded."` if diagnosis failed
+- **Recovery result** — outcome message and container status after the action
+- **Recent logs** — up to the last 4,000 characters (Email only)
+- **Timestamp** — UTC, human-readable
+
+Slack and Discord messages use a status indicator (✅ / ⚠️ / 🚨) driven by severity and success; Discord additionally colors the embed green on success and red on failure.
+
+### Example
+
+```env
+SLACK_ENABLED=true
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz
+
+DISCORD_ENABLED=true
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/xxx/yyy
+
+EMAIL_ENABLED=true
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=alerts@example.com
+SMTP_PASSWORD=app-specific-password
+EMAIL_FROM=alerts@example.com
+EMAIL_TO=oncall@example.com,team@example.com
+```
+
+Any channel left disabled (or missing its required settings) is skipped silently with a warning in the logs — the notification call itself never fails the recovery cycle.
+
 ## Agent Workflow
 
 1. **Observe** — pull recent logs for each monitored container.
@@ -261,15 +310,3 @@ Interactive OpenAPI docs are available at `/docs` once the server is running.
 - **Duplicate suppression** — repeated detections of the same underlying failure within `INCIDENT_SUPPRESSION_SECONDS` are treated as one incident, not re-triggered on every cycle.
 - **Best-effort notifications** — notification failures never block or fail the recovery pipeline itself.
 - **Graceful AI degradation** — if Ollama is unreachable or returns an invalid diagnosis, the agent falls back to a critical "AI unavailable" diagnosis and alerts rather than guessing.
-
-## Roadmap
-
-- Additional notification providers
-- Container health scoring
-- Kubernetes support
-- Scheduled reports
-- Deeper analytics
-
-## License
-
-This project is released under the [MIT License](LICENSE).
